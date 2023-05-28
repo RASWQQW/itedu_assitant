@@ -1,21 +1,22 @@
 ﻿using itedu_assitant.Model;
 using Microsoft.Extensions.Hosting;
 using System.Text;
+using Newtonsoft.Json;
 using System.Text.Json.Serialization;
 
 namespace itedu_assitant.forsave.Methods
 {
     public class Wh_Instance
     {
-        public string IdInstance = "";
-        public string ApiToken = "";
+        static public string IdInstance = "1101817976";
+        static public string ApiToken = "2296c806df794cf58b7006198428a267249c87ae5f444c6fab";
         static string AvatarPath = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).FullName, "Files");
 
         // And it is static value who cathes a big value
         static private Wh_Instance Instance;
 
         // It is first mesurment of Singleton
-        public Wh_Instance Create(string id_ins = "null", string apitoken = "null")
+        static public Wh_Instance Create(string id_ins = "null", string apitoken = "null")
         {
             bool newVals = true;
             if (id_ins == "null" || apitoken == "null")
@@ -34,14 +35,26 @@ namespace itedu_assitant.forsave.Methods
             ApiToken = apitoken;
         }
 
-
         // Area where happens basic manners
 
+
+        // It actually gets qr link as string and resturns as response
+        public byte[] GetQr()
+        {
+            string qr_get_link = $"https://api.green-api.com/waInstance{IdInstance}/qr/{ApiToken}";
+
+            using(var client = new HttpClient())
+            {
+                HttpResponseMessage message = client.GetAsync(qr_get_link).Result;
+                Dictionary<string, object> ResponseMessage = JsonConvert.DeserializeObject<Dictionary<string, object>>(message.Content.ToString());
+                return Encoding.ASCII.GetBytes((string)ResponseMessage["message"]);
+            }
+        }
 
         public string Send_Message(string chat_id, string message)
         {
 
-            var link = "";
+            var link = $"https://api.green-api.com/waInstance{IdInstance}/SendMessage/{ApiToken}";
             Dictionary<string, object> current_json = new Dictionary<string, object> { { "chat_id", chat_id }, { "message", message } };
             string messge_id = RequestSender(link, values: new List<Dictionary<string, object>> { new Dictionary<string, object> { { "type", "json" }, { "jsoncontent", current_json } } });
             return messge_id;

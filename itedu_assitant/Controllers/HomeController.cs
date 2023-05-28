@@ -1,3 +1,4 @@
+using itedu_assitant.forsave.Methods;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -17,13 +18,15 @@ namespace itedu_assitant.Controllers
     [Route("[controller]")]
     public class HomeController : ControllerBase
     {
+        static public Wh_Instance Container = Wh_Instance.Create();
         public HomeController()
         {
+            
         }
 
         [HttpGet("/send_message/{chat_id?}")]
         [ProducesResponseType(200, Type = typeof(OkObjectResult))]
-        public OkObjectResult Meeting(string chat_id = "0", [FromQuery(Name = "chat_id")] string query_chat_id = "None")
+        public OkObjectResult Meeting(string? chat_id = "0", [FromQuery(Name = "chat_id")] string query_chat_id = "None")
         {
             if (Request.Method == "GET")
             {
@@ -63,18 +66,12 @@ namespace itedu_assitant.Controllers
         }
 
         //[HttpGet(Name="Check")]
-        [HttpGet("api/[controller]/[action]/{san?}")]
-        public OkObjectResult Check(int san)
+        [HttpGet("/get_qr")]
+        public OkObjectResult Check()
         {
-            return Ok($"Alma {san}");
+            return Ok("Apple");
         }
 
-        //[HttpGet(Name = "Check2")]
-        [HttpGet("api/[controller]/[action]/{alma?}")]
-        public OkObjectResult PPPCHECK(int alma)
-        {
-            return Ok($"There is no relevant response {alma * 2}");
-        }
 
     }
 }
