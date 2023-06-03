@@ -1,3 +1,5 @@
+using itedu_assitant.DB;
+
 namespace itedu_assitant
 {
     public class Program
@@ -12,6 +14,7 @@ namespace itedu_assitant
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+            builder.Services.AddDbContext<dbcontext>();
 
             var app = builder.Build();
 
@@ -30,6 +33,9 @@ namespace itedu_assitant
             //    name: "default",
             //    pattern: "{controller=Home}/{action=Meeting}/{id?}");
 
+
+
+            app.MapControllers();
             app.Run();
         }
     }

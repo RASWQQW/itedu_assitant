@@ -3,6 +3,12 @@ using Microsoft.Extensions.Hosting;
 using System.Text;
 using Newtonsoft.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Components.Forms;
+using System.Diagnostics;
+using System.Collections.Generic;
+using itedu_assitant.Controllers;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using System;
 
 namespace itedu_assitant.forsave.Methods
 {
@@ -10,15 +16,30 @@ namespace itedu_assitant.forsave.Methods
     {
         static public string IdInstance = "1101817976";
         static public string ApiToken = "2296c806df794cf58b7006198428a267249c87ae5f444c6fab";
-        static string AvatarPath = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).FullName, "Files");
+        static string AvatarPath = Combine(new List<string> { "images" });
+        static string QRPath = Combine(new List<string> { "qr" });
+        static IEnumerable<EndpointDataSource> _endpoints;
+
+        static string Combine(List<string> vals)
+        {
+            string tempval = Path.Combine(Directory.GetCurrentDirectory(), "forsave", "Files");
+            foreach (var val in vals){
+                tempval = Path.Combine(tempval, val);
+            }
+
+            return tempval;
+        }
 
         // And it is static value who cathes a big value
         static private Wh_Instance Instance;
 
-        // It is first mesurment of Singleton
-        static public Wh_Instance Create(string id_ins = "null", string apitoken = "null")
+        // It is first measurment of Singleton
+        static public Wh_Instance Create(IEnumerable<EndpointDataSource> endpoints, string id_ins = "null", string apitoken = "null")
         {
+
+            _endpoints = endpoints;
             bool newVals = true;
+
             if (id_ins == "null" || apitoken == "null")
             {
                 id_ins = IdInstance; apitoken = ApiToken;
@@ -39,41 +60,106 @@ namespace itedu_assitant.forsave.Methods
 
 
         // It actually gets qr link as string and resturns as response
-        public byte[] GetQr()
+        public string GetQr()
         {
             string qr_get_link = $"https://api.green-api.com/waInstance{IdInstance}/qr/{ApiToken}";
 
             using(var client = new HttpClient())
             {
-                HttpResponseMessage message = client.GetAsync(qr_get_link).Result;
-                Dictionary<string, object> ResponseMessage = JsonConvert.DeserializeObject<Dictionary<string, object>>(message.Content.ToString());
-                return Encoding.ASCII.GetBytes((string)ResponseMessage["message"]);
+                var ResponseMessage = client.GetAsync(qr_get_link).Result.Content.ReadFromJsonAsync<Dictionary<string, object>>().Result;
+                //Dictionary<string, object> ResponseMessage = JsonConvert.DeserializeObject<Dictionary<string, object>>(message);
+
+                string givenString = ResponseMessage["message"].ToString();
+                if (givenString != null)
+                {
+                    byte[] imageBytes = Convert.FromBase64String(givenString);
+                    string filename = QRPath + "\\UserQr.png";
+                    File.WriteAllBytes(filename, imageBytes);
+                    return filename;
+                }
+                else
+                    return "Expected bytes are absence";
             }
         }
+        
+        // Here starts a checking of next methods to be sure with them
+        static bool IsActive(){
+            return new CheckActive(null).GetInstanceStatus()["stateInstance"].ToString() == "authorized";
+        }
 
-        public string Send_Message(string chat_id, string message)
+        public string GetActionUrl(string funcIs)
         {
+            // It first goes to get that one whole endpoints
+            var currentendPoints = _endpoints
+                .SelectMany(val => val.Endpoints)
+                .OfType<RouteEndpoint>();
 
+            // after this we gonna catch specefic controller and action url route
+            var urlroute = currentendPoints
+                            .Select(vals => vals.Metadata
+                                .OfType<ControllerActionDescriptor>()
+                                .Where(val => val.ActionName.Contains(funcIs))
+                                .Select(val =>
+                                {
+                                    return new
+                                    {
+                                        ActionIs = val.RouteValues.Values,
+                                        RouteIS = vals.RoutePattern.RawText.TrimStart('/')
+                                    };
+                                }));
+
+            var itworks = new Dictionary<string, object>();
+            foreach(List<object> val in urlroute)
+            {
+                if(val.FirstOrDefault().GetType() == typeof(Dictionary<,>))
+                    itworks.Concat((Dictionary<string, object>)val.FirstOrDefault());
+            }
+
+            return JsonConvert.SerializeObject(itworks);
+        }
+
+        public string Send_Message(string chat_id, string message) 
+        {
+            if (!IsActive())
+                // GetActionUrl(typeof(HomeController).GetMethods().FirstOrDefault(w => w.Name.Contains("SetNumber")).Name)
+                return $"You must to login {GetActionUrl("SetNumber")}";
+
+            chat_id = new Manager().GetNumberAsToken(chat_id);
             var link = $"https://api.green-api.com/waInstance{IdInstance}/SendMessage/{ApiToken}";
-            Dictionary<string, object> current_json = new Dictionary<string, object> { { "chat_id", chat_id }, { "message", message } };
-            string messge_id = RequestSender(link, values: new List<Dictionary<string, object>> { new Dictionary<string, object> { { "type", "json" }, { "jsoncontent", current_json } } });
+            Dictionary<string, object> current_json = new Dictionary<string, object> { { "chatId", chat_id }, { "message", message } };
+            var newsendingvalue = 
+                new List<Dictionary<string, object>>{ 
+                    new Dictionary<string, object> { 
+                        { "type", "json" }, 
+                        { "jsoncontent", current_json } 
+                    } 
+                };
+
+            string messge_id = RequestSender(link, qtype: "post", values: newsendingvalue) ;
             return messge_id;
         }
 
         // Group making area
+
+        // create group
         public string CreateGroup(string groupName,
                                 IEnumerable<string> chatIds,
                                 IEnumerable<string> admins = null,
                                 string Avatar = "None")
         {
+
+            if (!IsActive())
+                // GetActionUrl(typeof(HomeController).GetMethods().FirstOrDefault(w => w.Name.Contains("SetNumber")).Name)
+                return $"You must to login {GetActionUrl("SetNumber")}";
+
             string func_link = $"https://api.green-api.com/waInstance{IdInstance}/createGroup/{ApiToken}";
+            string isresult = RequestSender(func_link, qtype: "get");
 
             if (admins != null)
                 MakeAdmin(admins);
 
-            if (Avatar == "None")
+            if (Avatar == "None") 
                 Avatar = AvatarPath;
-
             SetPhoto(Avatar);
 
             return "Check";
@@ -107,39 +193,53 @@ namespace itedu_assitant.forsave.Methods
             }
         }
 
-        public string RequestSender(string Link, List<Dictionary<string, object>> values)
+        public string RequestSender(string Link, string qtype, List<Dictionary<string, object>>? values = null)
         {
-
             using (HttpClient httpc = new HttpClient())
             {
+                if(qtype == "get")
+                    return httpc.GetAsync(Link).Result.Content.ReadAsStringAsync().Result;
 
-
-                var formData = new MultipartFormDataContent();
-                StringContent content = null;
-
-                //foreach (Dictionary<string, object> val in values)
-                //{
-                //    if (val.ContainsKey("type") && val["type"] == "form")
-                //    {
-                //        formData.Add(val["object"], val["name"], val["filename"]);
-                //    }
-                //    else if (val["type"] == "json")
-                //    {
-                //        content = new StringContent(val["jsoncontent"], Encoding.UTF8, "application/json");
-                //    }
-                //}
-
-                HttpResponseMessage message = null;
-                if (content != null)
+                if (qtype == "post" && values != null)
                 {
-                    message = httpc.PostAsync(Link, content).Result;
-                }
-                else
-                {
-                    message = httpc.PostAsync(Link, formData).Result;
+                    var formData = new MultipartFormDataContent();
+                    StringContent content = null;
+
+                    foreach (Dictionary<string, object> val in values)
+                    {
+                        if(val.ContainsKey("type"))
+                            if (val["type"] == "json")
+                            {
+                                if (val.ContainsKey("jsoncontent") && val["jsoncontent"] is Dictionary<string, object>)
+                                {
+                                    var currentjson = val["jsoncontent"];
+                                    Debug.WriteLine(currentjson + " " + currentjson.GetType().ToString());
+                                    string isstring = JsonConvert.SerializeObject(currentjson);
+                                    content = new StringContent(isstring, Encoding.UTF8, "application/json");
+                                }
+                                else if (val["type"] == "form"){
+                                    var firstarg = val["type"];
+                                    Dictionary<string, object> nexc = val.ContainsKey("content") ? (Dictionary<string, object>)val["content"] : null;
+                                    if (firstarg as HttpContent != null)
+                                       if (nexc == null)
+                                           formData.Add((HttpContent)firstarg);
+                                       else
+                                           formData.Add((HttpContent)firstarg, nexc.ContainsKey("name") ? (string)nexc["name"] : default, nexc.ContainsKey("filename") ? (string)nexc["filename"] : default);
+                                }   
+                            }
+                    }
+
+                    HttpResponseMessage message;
+                    if (content != null)
+                        message = httpc.PostAsync(Link, content).Result;
+                    else
+                        message = httpc.PostAsync(Link, formData).Result;
+
+                    return message.Content.ReadAsStringAsync().Result;
                 }
 
-                return message.Content.ToString();
+                throw new ArgumentException("You didn't pass qtype arg or is wrong");
+
             }
 
         }
