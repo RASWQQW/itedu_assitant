@@ -10,7 +10,6 @@ namespace itedu_assitant.forsave.Methods
 {
     public class CheckActive
     {
-
         static string idInstance = Wh_Instance.IdInstance;
         static string ApiToken = Wh_Instance.ApiToken;
         public Wh_Instance mainIns;
@@ -29,13 +28,15 @@ namespace itedu_assitant.forsave.Methods
         }
         public Dictionary<string, object> GetActiveNumberFromBase()
         {
-            var currentActive = _context.CurrentActive.Include(w => w.IsActive).First();
-            return new Dictionary<string, object> { {"activeId", currentActive.IsActive.id }, { "number", currentActive.IsActive.phoneNumber } };
+            var currentActive = _context.contcurrentactive.Include(w => w.IsActive).FirstOrDefault();
+            if(currentActive != null)
+                return new Dictionary<string, object> { {"activeId", currentActive?.IsActive.id }, { "number", currentActive?.IsActive.phoneNumber } };
+            return new Dictionary<string, object> { { "active_number", "None" } };
         }
-        public void SetNewNumber()
+        public Tuple<string, string> SetNewNumber()
         {
             // First step removing a number from instance if here is already number
-            if ((string)this.GetInstanceStatus()["stateInstance"] == "authorized")
+            if ((string)GetInstanceStatus()["stateInstance"] == "authorized")
             {
                 string logoutLink = $"https://api.green-api.com/waInstance{idInstance}/logout/{ApiToken}";
                 var result = JsonConvert.DeserializeObject<Dictionary<string, object>>(mainIns.RequestSender(Link: logoutLink, qtype: "get"));
@@ -46,12 +47,16 @@ namespace itedu_assitant.forsave.Methods
             // Next is if there qr scanned there would be current number saved in base as active
             // There must be go cycle in around 10 mins to check and implement
 
-            var val = new BackgroundTaskManage(this);
+            var val = new BackgroundTaskManage(method: this.BaseWriter);
             var newtokengen = new CancellationTokenSource();
             val.StartAsync(newtokengen.Token);
 
             //Lastly to the end is sending Qr
-            new HomeController().Check();
+            //new HomeController().Check();
+
+            // Here likely goes just Redirect but it is enugh to catch
+            //HomeController.Check();
+            return new Tuple<string, string>("Check", "Home");
 
         }
         public void BaseWriter(object? states)
@@ -63,24 +68,36 @@ namespace itedu_assitant.forsave.Methods
             }
 
             int packedTime = 0;
+            string usernumber = null;
+            string linkIs = $"https://api.green-api.com/waInstance{idInstance}/getSettings/{ApiToken}";
             while (TimeSpan.FromMinutes(15).Seconds <= packedTime) // user custom check
             {  
-                string linkIs = $"https://api.green-api.com/wainstace{idInstance}/getSettings/{ApiToken}";
-                Dictionary<string, object> response = JsonConvert.DeserializeObject<Dictionary<string, object>>(mainIns.RequestSender(linkIs, "get"));
-                string usernumber = new Regex(@"^\d*@c.us$").Match((string)response["wid"]).Value.ToString();
+                // TODO here is one thing that api request can not wok properly
+                var isRequestResult = mainIns.RequestSender(linkIs, "get");
+                Dictionary<string, object> response = JsonConvert.DeserializeObject<Dictionary<string, object>>(isRequestResult);
+                string isnumberid = (string)response["wid"];
+                if (new Regex(@"^\d*(@c\.us|@g\.us)$").Match(isnumberid).Success)
+                    usernumber = new Regex(@"^\d+").Match(isnumberid).Value;
 
-                if(usernumber != null)
+                if (usernumber != null)
                 {
                     // Lastly here goes saving on base
-                    UserNumbers Query() => _context.UserNumbers.FirstOrDefault(w => w.phoneNumber == usernumber);
+                    ManagerNumbers Query() => _context.contmanagernumbers.FirstOrDefaultAsync(w => w.phoneNumber == usernumber).Result;
                     if (Query() == null)
-                        _context.UserNumbers.Add(new UserNumbers { phoneNumber = usernumber });
+                        _context.contmanagernumbers.Add(new ManagerNumbers { phoneNumber = usernumber });
 
-                    Active currentActive = _context.CurrentActive.First();
-                    currentActive.LastInsert = DateTime.Now.Date.ToUniversalTime();
-                    currentActive.IsActive = Query();
-                    currentActive.changeAmount++;
+                    Active currentActive = _context.contcurrentactive.FirstOrDefaultAsync().Result;
+                    if(currentActive != null)
+                    {
+                        currentActive.LastInsert = DateTime.Now.Date.ToUniversalTime();
+                        currentActive.IsActive = Query();
+                        currentActive.changeAmount++;
+                    }
+                    else
+                        _context.contcurrentactive.Add(new Active { IsActive = Query() });
+
                     _context.SaveChanges();
+
                 }
 
                 // Check that here is all ok
@@ -88,7 +105,7 @@ namespace itedu_assitant.forsave.Methods
                 // sleep time to create little delay
                 Thread.Sleep(25000);
                 // add time to while validation check
-                packedTime = packedTime + TimeSpan.FromSeconds(25).Seconds;                
+                packedTime = packedTime + TimeSpan.FromSeconds(10).Seconds;                
 
             }
         }

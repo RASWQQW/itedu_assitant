@@ -1,26 +1,36 @@
-﻿namespace itedu_assitant.forsave.Methods
+﻿using itedu_assitant.forsave.Contact_is;
+
+namespace itedu_assitant.forsave.Methods
 {
     public class BackgroundTaskManage : IHostedService
     {
 
         private Timer _timer;
-        public CheckActive currentActiveInstance;
-        
+        private TimerCallback _method;
+        private Dictionary<string, object> _args;
+        private IServiceProvider _services;
 
-       public BackgroundTaskManage(CheckActive cins)
+       public BackgroundTaskManage(IServiceProvider service)
        {
-            currentActiveInstance = cins;
+            _services = service;
        }
-        
+
+       public BackgroundTaskManage(TimerCallback method, Dictionary<string, object> args = null)
+       {
+            _method = method;
+            _args = args != null ? args : new Dictionary<string, object>();
+       }
+
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            
-            _timer = new Timer(currentActiveInstance.BaseWriter, null, TimeSpan.Zero, TimeSpan.FromMinutes(15));
+            _args["cttoken"] = cancellationToken;
+            _timer = new Timer(_method, _args, TimeSpan.Zero, TimeSpan.FromMinutes(15));
             return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _timer.Dispose();
             return Task.CompletedTask;
         }

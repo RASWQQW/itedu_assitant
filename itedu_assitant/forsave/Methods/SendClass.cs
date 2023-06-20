@@ -10,6 +10,5 @@
             current_message = message;
         }
 
-
     }
 }

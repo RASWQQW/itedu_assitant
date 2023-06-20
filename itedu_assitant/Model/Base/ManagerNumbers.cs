@@ -1,6 +1,6 @@
 ﻿namespace itedu_assitant.Model.Base
 {
-    public class UserNumbers
+    public class ManagerNumbers
     {
         public int id { get; set; }
         public string phoneNumber { get; set; }

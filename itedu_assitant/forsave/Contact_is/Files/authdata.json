@@ -1,0 +1,11 @@
+{
+  "web": {
+    "client_id": "46260588021-okd337qv112lsrqongtdojj4ldof1epl.apps.googleusercontent.com",
+    "project_id": "graphical-mile-330816",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_secret": "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",
+    "redirect_uris": [ "http://127.0.0.1:53799/authorize/", "https://www.googleapis.com/auth/contacts", "http://127.0.0.1:7157/authorize/" ]
+  }
+}

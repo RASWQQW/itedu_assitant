@@ -6,7 +6,7 @@ namespace itedu_assitant.DB
     public class dbcontext : DbContext
     {
         public dbcontext(DbContextOptions<dbcontext> options) : base(options) {
-            //Database.EnsureCreated();
+            Database.EnsureCreated();
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -25,16 +25,18 @@ namespace itedu_assitant.DB
             var connectVal = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("dbsettings.json")
-                .Build()
+                .Build()        
                 .GetConnectionString("HostConnection");
 
             builder.UseNpgsql(connectVal);
 
         }
 
-        public DbSet<Instance> UserInstance {get; set;}
-        public DbSet<Active> CurrentActive { get; set; }
-        public DbSet<UserNumbers> UserNumbers { get; set; }
-
+        public DbSet<Instance> cntuserinstance { get; set;} // not important
+        public DbSet<Active> contcurrentactive { get; set; } // not very important
+        public DbSet<ManagerNumbers> contmanagernumbers { get; set; } // important
+        public DbSet<Access_token> access_tokens { get; set; } // vey important
+        public DbSet<Groups> contusergroups { get; set; } // not so much important
+        public DbSet<Users> contusers { get; set;  } // important
     }
-}
+}   

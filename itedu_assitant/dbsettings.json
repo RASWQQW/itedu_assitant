@@ -1,6 +1,6 @@
 {
   "ConnectionStrings": {
-    "HostConnection": "Server=postgres://default:R1wdMuZT4EBl@ep-twilight-shape-995344-pooler.us-east-1.postgres.vercel-storage.com:5432/verceldb; Database=verceldb;Port=5432;User id=default;Password=R1wdMuZT4EBl",
+    "HostConnection": "Server=ep-twilight-shape-995344-pooler.us-east-1.postgres.vercel-storage.com; Database=verceldb; Port=5432; User id=default; Password=R1wdMuZT4EBl",
     "LocalHostConnection": "Server=localhost; Database=CiHome; Port=5432; User id=postgres; Password=123"
   }
 }

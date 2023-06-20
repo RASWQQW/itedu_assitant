@@ -1,35 +1,34 @@
 using itedu_assitant.DB;
+using itedu_assitant.forsave.Contact_is;
 using itedu_assitant.forsave.Methods;
+using itedu_assitant.Model.ForvView;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Primitives;
+using Microsoft.OpenApi.Models;
+using Newtonsoft.Json;
+using RestSharp;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
+using System.Net;
+using System.Security.AccessControl;
+using System.Text;
 
 namespace itedu_assitant.Controllers
 {
-
-    public class Check{
-        [Required]
-        public string groupname { get; set; }
-
-        public List<string> admins { get; set; } = null;
-        public IFormFile group_image { get; set; } = null;
-    }
 
     [ApiController]
     [Route("[controller]")]
     public class HomeController : ControllerBase
     {
-
-        public HomeController(dbcontext dbcontext = null, IEnumerable<EndpointDataSource> data_endpoints=null)
+        public HomeController(dbcontext dbcontext = null, IEnumerable<EndpointDataSource> data_endpoints = null)
         {
+            // Theses all secondry setting variables and gets vals after setting env and global vals
             _context = dbcontext;
             endpoints = data_endpoints;
-            Container = Wh_Instance.Create(endpoints: endpoints);
+            Container = Wh_Instance.Create(endpoints: endpoints, context: _context);
             checkActive = new CheckActive(dbcontext: _context, isclass: Container);
-
         }
 
         static dbcontext _context;
@@ -37,10 +36,14 @@ namespace itedu_assitant.Controllers
         public Wh_Instance Container;
         public CheckActive checkActive;
 
+
         [HttpGet("/checkgetroute")]
         public IActionResult Runner()
         {
-            return Ok($"It is string - {Container.GetActionUrl("SetNumber")}");
+
+            var islocalpart = Request.Host.Host;
+            Environment.SetEnvironmentVariable("HostServer2", islocalpart);
+            return Ok($"It is string - {Container.GetActionUrl("SetNumber")["route"]}");
         }
 
         [HttpGet("/send_message/{chat_id?}")]
@@ -55,66 +58,43 @@ namespace itedu_assitant.Controllers
 
             if (Request.Method == "GET")
                 return Ok(Container.Send_Message(chat_id, "Hello My food Mate"));
-                //return Ok(new Dictionary<string, object> { { "user_id", chat_id } });
+            //return Ok(new Dictionary<string, object> { { "user_id", chat_id } });
 
-            else if (Request.Method == "POST"){
-                if (Request.HasJsonContentType()){
+            else if (Request.Method == "POST") {
+                if (Request.HasJsonContentType()) {
                     var rqeuest_vals = Request.ReadFromJsonAsync<Dictionary<string, object>>();
                 }
             }
             return Ok("Bad request");
         }
 
-
         [ProducesResponseType(200, Type = typeof(OkObjectResult))]
         [HttpPost("/create_croup")]
-        public OkObjectResult ForCreateG(Check val, IFormFile group_avatar)
+        public OkObjectResult ForCreateG([FromForm] Check val)
         {
             if (Request.Method == "POST")
             {
-                if (Request.HasJsonContentType())
-                {
-                    var group_content = Request.ReadFromJsonAsync<Dictionary<string, object>>();
+                string ispath = "None";
+                var is_group_image = val.group_image;
+                if(is_group_image != null) {
+                    ispath = Path.Combine(Directory.GetCurrentDirectory(), "forsave", "Files", "userimages", "usergroupfile.png");
+
+                    void createImage(){
+                        using (Stream isstream = new FileStream(ispath, FileMode.OpenOrCreate)){
+                            is_group_image.CopyToAsync(isstream);
+                            if (!Directory.Exists(ispath)){
+                                createImage();
+                            }
+                        };
+                    };
+                    createImage();
                 }
+                
+                Container.CreateGroup(groupName: val.groupname, admins: val.admins, chatIds: val.users, Avatar: ispath);
             }
             return Ok("There is no relevant response");
         }
 
-        //[HttpGet(Name="Check")]
-        [HttpGet("/[action]/get_qr/{id?}")]
-        public IActionResult Check(string? id = null)
-        {
-            Debug.WriteLine("Qr_get in", id);
-            try
-            {
-                var res = Container.GetQr();
-                //var html = $"<img href='{res}'>";
-                //return base.Content(html, "text/html0");
-                byte[] readqr = System.IO.File.ReadAllBytesAsync(res).Result;
-                return File(readqr, "image/jpeg");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex);
-                return base.Content($"<h1>There happened trouble{ex}<h1>", "text/html");
-            }
-        }
-
-        [HttpGet("/get-c-whaccount/{userNumber?}")]
-        public IActionResult GetCurrentUser(bool userNumber = false)
-        {
-            var is_active = checkActive.GetInstanceStatus();
-            Dictionary<string, object> phonenumber = null;
-
-            if (userNumber && is_active["stateInstance"].ToString() == "authorized")
-                phonenumber = checkActive.GetActiveNumberFromBase();
-            
-            return Ok(new Dictionary<string, object>(){ {"status", is_active }, { "phoneNumber", phonenumber} });
-        }
-
-        [HttpGet("/set_number")]
-        public void SetNumber(){
-            checkActive.SetNewNumber();
-        }
+        
     }
 }

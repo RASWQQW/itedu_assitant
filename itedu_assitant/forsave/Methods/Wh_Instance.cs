@@ -9,6 +9,13 @@ using System.Collections.Generic;
 using itedu_assitant.Controllers;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System;
+using System.Collections;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using System.Linq;
+using itedu_assitant.DB;
+using Microsoft.Extensions.Primitives;
+using itedu_assitant.Model.Base;
+using Microsoft.EntityFrameworkCore;
 
 namespace itedu_assitant.forsave.Methods
 {
@@ -16,8 +23,9 @@ namespace itedu_assitant.forsave.Methods
     {
         static public string IdInstance = "1101817976";
         static public string ApiToken = "2296c806df794cf58b7006198428a267249c87ae5f444c6fab";
-        static string AvatarPath = Combine(new List<string> { "images" });
+        static string AvatarPath = Combine(new List<string> { "images", "groupimage.png" });
         static string QRPath = Combine(new List<string> { "qr" });
+        static dbcontext _context;
         static IEnumerable<EndpointDataSource> _endpoints;
 
         static string Combine(List<string> vals)
@@ -34,10 +42,11 @@ namespace itedu_assitant.forsave.Methods
         static private Wh_Instance Instance;
 
         // It is first measurment of Singleton
-        static public Wh_Instance Create(IEnumerable<EndpointDataSource> endpoints, string id_ins = "null", string apitoken = "null")
+        static public Wh_Instance Create(dbcontext context, IEnumerable<EndpointDataSource> endpoints = null, string id_ins = "null", string apitoken = "null")
         {
 
             _endpoints = endpoints;
+            _context = context;
             bool newVals = true;
 
             if (id_ins == "null" || apitoken == "null")
@@ -83,39 +92,47 @@ namespace itedu_assitant.forsave.Methods
         }
         
         // Here starts a checking of next methods to be sure with them
-        static bool IsActive(){
-            return new CheckActive(null).GetInstanceStatus()["stateInstance"].ToString() == "authorized";
+        public bool IsActive(){
+            return new CheckActive(this, _context).GetInstanceStatus()["stateInstance"].ToString() == "authorized";
         }
 
-        public string GetActionUrl(string funcIs)
+        public Dictionary<string, object> GetActionUrl(string funcIs)
         {
+            var HostString = Environment.GetEnvironmentVariable("HostServer2");
             // It first goes to get that one whole endpoints
-            var currentendPoints = _endpoints
-                .SelectMany(val => val.Endpoints)
-                .OfType<RouteEndpoint>();
-
-            // after this we gonna catch specefic controller and action url route
-            var urlroute = currentendPoints
-                            .Select(vals => vals.Metadata
-                                .OfType<ControllerActionDescriptor>()
-                                .Where(val => val.ActionName.Contains(funcIs))
-                                .Select(val =>
-                                {
-                                    return new
-                                    {
-                                        ActionIs = val.RouteValues.Values,
-                                        RouteIS = vals.RoutePattern.RawText.TrimStart('/')
-                                    };
-                                }));
-
-            var itworks = new Dictionary<string, object>();
-            foreach(List<object> val in urlroute)
+            if(_endpoints != null)
             {
-                if(val.FirstOrDefault().GetType() == typeof(Dictionary<,>))
-                    itworks.Concat((Dictionary<string, object>)val.FirstOrDefault());
-            }
+                var currentendPoints = _endpoints
+                    .SelectMany(val => val.Endpoints)
+                    .OfType<RouteEndpoint>();
 
-            return JsonConvert.SerializeObject(itworks);
+                // after this we gonna catch specefic controller and action url route
+                var urlroute = currentendPoints
+                                .Select(vals => vals.Metadata
+                                    .OfType<ControllerActionDescriptor>()
+                                    .Where(val => val.ActionName.Contains(funcIs))
+                                    .Select(val => {
+                                        return new Dictionary<string, object>{
+                                            {"ActionIs", val.RouteValues.Values},
+                                            { "RouteIs", vals.RoutePattern.RawText.TrimStart('/')}
+                                        };
+                                    }));
+
+                var itworks = new Dictionary<string, object>();
+                int routecount = 0;
+                foreach(var val in urlroute){
+                    var firstIs = val.FirstOrDefault();
+                    if(firstIs != null && firstIs is IDictionary){
+                        itworks.TryAdd("action", firstIs["ActionIs"]);
+                        if (HostString != null){
+                            if (itworks.ContainsKey($"route{firstIs["ActionIs"]}{routecount}")) routecount++;
+                                itworks.TryAdd($"route{firstIs["ActionIs"]}{routecount}", $"{HostString}/{firstIs["RouteIs"]}");
+                        }
+                    }
+                }
+                return itworks;
+            }
+            throw new Exception("here have to be _endpints in object");
         }
 
         public string Send_Message(string chat_id, string message) 
@@ -141,10 +158,37 @@ namespace itedu_assitant.forsave.Methods
 
         // Group making area
 
+
+        public void DeleteGroup(string? groupName = null, int? groupId = null )
+        {
+            if(groupName != null)
+            {
+                var curgr = _context.contusergroups.FirstOrDefault(w => w.name == groupName);
+                _context.contusergroups.Remove(curgr);
+            }
+            else if (groupId != null)
+            {
+                var curgr = _context.contusergroups.FirstOrDefault(w => w.group_id == groupName);
+                _context.contusergroups.Remove(curgr);
+            }
+            _context.SaveChanges();
+        }
+
+        public void DeleteAdmin()
+        {
+            
+        }
+
+        public void DeleteUser()
+        {
+
+        }
+
+
         // create group
         public string CreateGroup(string groupName,
-                                IEnumerable<string> chatIds,
-                                IEnumerable<string> admins = null,
+                                List<string> chatIds,
+                                List<string> admins = null,
                                 string Avatar = "None")
         {
 
@@ -153,10 +197,43 @@ namespace itedu_assitant.forsave.Methods
                 return $"You must to login {GetActionUrl("SetNumber")}";
 
             string func_link = $"https://api.green-api.com/waInstance{IdInstance}/createGroup/{ApiToken}";
-            string isresult = RequestSender(func_link, qtype: "get");
+
+
+            List<string> MakeProperNumber<T>(List<T> numbers) {
+                List<string> newchatIds = new List<string>();
+                for (int i = 0; i < numbers.Count(); i++)
+                {
+                    newchatIds.Add(new Manager().GetNumberAsToken(numbers.ToList()[i]));
+                }
+                return newchatIds;
+            }
+
+            var currentContent = new Dictionary<string, object> { { "groupName", groupName }, { "chatIds", MakeProperNumber<string>(chatIds) } };
+            var iscontent = new List<Dictionary<string, object>> {
+                new Dictionary<string, object> { 
+                    { "type", "json" }, 
+                    { "jsoncontent", currentContent}
+                }
+            };
+
+            var isresult = JsonConvert.DeserializeObject<Dictionary<string, object>>(RequestSender(func_link, qtype: "post", iscontent));
+            isresult.TryGetValue("chatId", out object? isgroupid);
+            isresult.TryGetValue("groupInviteLink", out object? islink);
+
+            if(isgroupid != null && islink != null)
+            {
+                _context.Add(new Groups{
+                        name = groupName != null ? groupName : "new lec group" + _context.contusergroups.FirstOrDefault().id,
+                        group_id = (string)isgroupid,
+                        group_link= (string)islink,
+
+                    });
+                _context.SaveChanges();
+            }
+
 
             if (admins != null)
-                MakeAdmin(admins);
+                MakeAdmin(MakeProperNumber<string>(admins), (string)isgroupid);
 
             if (Avatar == "None") 
                 Avatar = AvatarPath;
@@ -166,9 +243,16 @@ namespace itedu_assitant.forsave.Methods
         }
 
 
-        public List<object> MakeAdmin(IEnumerable<string> admins)
+        public List<object> MakeAdmin(IEnumerable<string> admins, string chatid)
         {
             string link = $"https://api.green-api.com/waInstance{IdInstance}/setGroupAdmin/{ApiToken}";
+
+            List<object> responses = new List<object>();
+            foreach(string admin in admins){
+                var content_is = new Dictionary<string, object> { { "groupId", chatid }, { "participantChatId", admin} };
+                var response = RequestSender(link, qtype: "post", new List<Dictionary<string, object>> { new Dictionary<string, object> { { "type", "json" }, { "jsoncontent", content_is } } });
+                responses.Add(response);
+            }
 
             return new List<object> { "Check" };
         }
@@ -208,7 +292,7 @@ namespace itedu_assitant.forsave.Methods
                     foreach (Dictionary<string, object> val in values)
                     {
                         if(val.ContainsKey("type"))
-                            if (val["type"] == "json")
+                            if (val["type"].ToString() == "json")
                             {
                                 if (val.ContainsKey("jsoncontent") && val["jsoncontent"] is Dictionary<string, object>)
                                 {
