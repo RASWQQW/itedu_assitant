@@ -8,14 +8,13 @@ using System.Text.RegularExpressions;
 
 namespace itedu_assitant.forsave.Methods
 {
-    public class CheckActive
+    public class InstanceCheckActive
     {
         static string idInstance = Wh_Instance.IdInstance;
         static string ApiToken = Wh_Instance.ApiToken;
         public Wh_Instance mainIns;
         static dbcontext _context;
-            
-        public CheckActive(Wh_Instance isclass, dbcontext? dbcontext = null)
+        public InstanceCheckActive(Wh_Instance isclass, dbcontext? dbcontext = null)
         {
             mainIns = isclass;
             _context = dbcontext;
@@ -47,7 +46,7 @@ namespace itedu_assitant.forsave.Methods
             // Next is if there qr scanned there would be current number saved in base as active
             // There must be go cycle in around 10 mins to check and implement
 
-            var val = new BackgroundTaskManage(method: this.BaseWriter);
+            var val = new BackgroundTaskManage().SetArgs(is_method: this.BaseWriter);
             var newtokengen = new CancellationTokenSource();
             val.StartAsync(newtokengen.Token);
 

@@ -8,17 +8,17 @@ namespace itedu_assitant.Controllers
 
     [ApiController]
     [Route("[controller]")]
-    public class AdminController : Controller
+    public class AdminController : ControllerBase
     {
         public readonly dbcontext _context;
-        public readonly CheckActive checkActive;
+        public readonly InstanceCheckActive checkActive;
         public readonly Wh_Instance Container;
 
         public AdminController(dbcontext Context)
         {
             _context = Context;
             Container = Wh_Instance.Create(context: _context);
-            checkActive = new CheckActive(dbcontext: _context, isclass: Container);
+            checkActive = new InstanceCheckActive(dbcontext: _context, isclass: Container);
         }
 
         //[HttpGet(Name="Check")]

@@ -13,7 +13,6 @@ namespace itedu_assitant.forsave.Contact_is.Methods
 
         public dbcontext _context;
 
-
         public IEnumerable<Users> GetUserById(string group_id)
         {
             // _context.contusergroups.FirstOrDefault(w => w.group_id == group_id).group_id
@@ -24,10 +23,14 @@ namespace itedu_assitant.forsave.Contact_is.Methods
         public Access_token GetFromBase()
         {
             if (_context != null)
-                return _context.access_tokens.LastOrDefault();
+            {
+                var selectedVal = _context.access_tokens.OrderBy(w => w.id).FirstOrDefault();
+               return selectedVal;
+            }
             else
                 throw new Exception("_context is not implemented");
         }
+        
         public void SetInBase(string at, string rt, int expires, List<string> scopes)
         {
             if (_context != null)
@@ -39,12 +42,14 @@ namespace itedu_assitant.forsave.Contact_is.Methods
                     iscode.refresh_token = rt;
                     iscode.expires_in = expires;
                     iscode.scopes = scopes;
-                    iscode.last_change = DateTime.Now.Date.ToUniversalTime();
+                    iscode.last_change = DateTime.Now.ToUniversalTime();
 
                 }
                 else
                     _context.access_tokens.Add(
                         new Access_token { access_token = at, refresh_token = rt, expires_in = expires, scopes = scopes });
+
+                _context.access_tokens.Update(iscode);
                 _context.SaveChanges();
             }
             else

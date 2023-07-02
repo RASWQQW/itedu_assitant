@@ -16,6 +16,7 @@
     <PackageReference Include="Google.Apis.Docs.v1" Version="1.60.0.2979" />
     <PackageReference Include="Google.Apis.PeopleService.v1" Version="1.60.0.2924" />
     <PackageReference Include="Google.Apis.Tasks.v1" Version="1.60.0.3015" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.48" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="7.0.5">
       <PrivateAssets>all</PrivateAssets>
@@ -27,13 +28,13 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="7.0.4" />
     <PackageReference Include="RestSharp" Version="110.2.0" />
     <PackageReference Include="Selenium.WebDriver" Version="4.9.1" />
+    <PackageReference Include="StackExchange.Redis" Version="2.6.116" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="forsave\Files\userImages\" />
-    <Folder Include="forsave\Files\qr\" />
-    <Folder Include="forsave\Interfaces\" />
+    <Folder Include="Extensions\Files\userImages\" />
+    <Folder Include="Extensions\Interfaces\" />
   </ItemGroup>
 
 </Project>

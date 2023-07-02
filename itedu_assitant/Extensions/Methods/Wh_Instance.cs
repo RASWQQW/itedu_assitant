@@ -16,6 +16,7 @@ using itedu_assitant.DB;
 using Microsoft.Extensions.Primitives;
 using itedu_assitant.Model.Base;
 using Microsoft.EntityFrameworkCore;
+using Aspose.Email;
 
 namespace itedu_assitant.forsave.Methods
 {
@@ -30,7 +31,7 @@ namespace itedu_assitant.forsave.Methods
 
         static string Combine(List<string> vals)
         {
-            string tempval = Path.Combine(Directory.GetCurrentDirectory(), "forsave", "Files");
+            string tempval = Path.Combine(Directory.GetCurrentDirectory(), "Extensions", "Files");
             foreach (var val in vals){
                 tempval = Path.Combine(tempval, val);
             }
@@ -44,7 +45,6 @@ namespace itedu_assitant.forsave.Methods
         // It is first measurment of Singleton
         static public Wh_Instance Create(dbcontext context, IEnumerable<EndpointDataSource> endpoints = null, string id_ins = "null", string apitoken = "null")
         {
-
             _endpoints = endpoints;
             _context = context;
             bool newVals = true;
@@ -66,7 +66,6 @@ namespace itedu_assitant.forsave.Methods
         }
 
         // Area where happens basic manners
-
 
         // It actually gets qr link as string and resturns as response
         public string GetQr()
@@ -93,7 +92,7 @@ namespace itedu_assitant.forsave.Methods
         
         // Here starts a checking of next methods to be sure with them
         public bool IsActive(){
-            return new CheckActive(this, _context).GetInstanceStatus()["stateInstance"].ToString() == "authorized";
+            return new InstanceCheckActive(this, _context).GetInstanceStatus()["stateInstance"].ToString() == "authorized";
         }
 
         public Dictionary<string, object> GetActionUrl(string funcIs)
@@ -141,7 +140,7 @@ namespace itedu_assitant.forsave.Methods
                 // GetActionUrl(typeof(HomeController).GetMethods().FirstOrDefault(w => w.Name.Contains("SetNumber")).Name)
                 return $"You must to login {GetActionUrl("SetNumber")}";
 
-            chat_id = new Manager().GetNumberAsToken(chat_id);
+            chat_id = new NumberManager().GetNumberAsToken(chat_id);
             var link = $"https://api.green-api.com/waInstance{IdInstance}/SendMessage/{ApiToken}";
             Dictionary<string, object> current_json = new Dictionary<string, object> { { "chatId", chat_id }, { "message", message } };
             var newsendingvalue = 
@@ -157,21 +156,35 @@ namespace itedu_assitant.forsave.Methods
         }
 
         // Group making area
-
-
         public void DeleteGroup(string? groupName = null, int? groupId = null )
         {
+            Groups curgr = null;
             if(groupName != null)
-            {
-                var curgr = _context.contusergroups.FirstOrDefault(w => w.name == groupName);
-                _context.contusergroups.Remove(curgr);
-            }
+                curgr = _context.contusergroups.FirstOrDefault(w => w.name == groupName);
             else if (groupId != null)
+                curgr = _context.contusergroups.FirstOrDefault(w => w.group_id == groupName);
+
+            if(curgr != null)
             {
-                var curgr = _context.contusergroups.FirstOrDefault(w => w.group_id == groupName);
-                _context.contusergroups.Remove(curgr);
+                var users = _context.contusers.Where(w => w.userGroup.group_id == curgr.group_id).ToList();
+                foreach(var user in users)
+                {
+                    DeleteUser(user.userWhatsappId,curgr.group_id);
+                }
+
+                var leaveUrl = $"https://api.green-api.com/waInstance{Instance}/leaveGroup/{ApiToken}";
+
+                var val1 = new Dictionary<string, object> { { "groupId", curgr.group_id} };
+                var vals = new List<Dictionary<string, object>> { 
+                    new Dictionary<string, object> 
+                    { { "type", "json"}, {"jsonconten", val1 } } };
+
+                RequestSender(leaveUrl, qtype: "post", values: vals);
             }
             _context.SaveChanges();
+
+            // https://green-api.com/docs/api/groups/RemoveGroupParticipant/
+            // https://green-api.com/docs/api/groups/LeaveGroup/
         }
 
         public void DeleteAdmin()
@@ -179,36 +192,45 @@ namespace itedu_assitant.forsave.Methods
             
         }
 
-        public void DeleteUser()
+        public void DeleteUser(string UserId, string GroupId)
         {
+            var deleteLink = $"https://api.green-api.com/waInstance{Instance}/removeGroupParticipant/{ApiToken}";
+            var userdata = new Dictionary<string, object> { { "groupId", UserId }, { "participantChatId",  GroupId} };
+            var data = new List<Dictionary<string, object>> { 
+                new Dictionary<string, object> { 
+                    { "type", "json"}, 
+                    { "jsoncontent", userdata} }
+            };
 
+            RequestSender(Link: deleteLink, values: data, qtype: "post");
+            
+            // https://green-api.com/docs/api/groups/LeaveGroup/
         }
 
 
+
         // create group
-        public string CreateGroup(string groupName,
+        public new dynamic CreateGroup(string groupName,
                                 List<string> chatIds,
                                 List<string> admins = null,
                                 string Avatar = "None")
         {
-
             if (!IsActive())
                 // GetActionUrl(typeof(HomeController).GetMethods().FirstOrDefault(w => w.Name.Contains("SetNumber")).Name)
                 return $"You must to login {GetActionUrl("SetNumber")}";
-
-            string func_link = $"https://api.green-api.com/waInstance{IdInstance}/createGroup/{ApiToken}";
-
 
             List<string> MakeProperNumber<T>(List<T> numbers) {
                 List<string> newchatIds = new List<string>();
                 for (int i = 0; i < numbers.Count(); i++)
                 {
-                    newchatIds.Add(new Manager().GetNumberAsToken(numbers.ToList()[i]));
+                    newchatIds.Add(new NumberManager().GetNumberAsToken(numbers.ToList()[i]));
                 }
                 return newchatIds;
             }
-
-            var currentContent = new Dictionary<string, object> { { "groupName", groupName }, { "chatIds", MakeProperNumber<string>(chatIds) } };
+            string func_link = $"https://api.green-api.com/waInstance{IdInstance}/createGroup/{ApiToken}";
+            admins = MakeProperNumber<string>(admins);
+            var propernumbers = MakeProperNumber<string>(chatIds);
+            var currentContent = new Dictionary<string, object> { { "groupName", groupName }, { "chatIds", propernumbers } };
             var iscontent = new List<Dictionary<string, object>> {
                 new Dictionary<string, object> { 
                     { "type", "json" }, 
@@ -220,33 +242,53 @@ namespace itedu_assitant.forsave.Methods
             isresult.TryGetValue("chatId", out object? isgroupid);
             isresult.TryGetValue("groupInviteLink", out object? islink);
 
-            if(isgroupid != null && islink != null)
-            {
-                _context.Add(new Groups{
-                        name = groupName != null ? groupName : "new lec group" + _context.contusergroups.FirstOrDefault().id,
-                        group_id = (string)isgroupid,
-                        group_link= (string)islink,
+            // start of the base and other stuffs
+            try{if (admins != null || admins.Count() > 0)
+                    MakeAdmin(admins, (string)isgroupid);
+            }catch (Exception ex) { Debug.WriteLine(ex); }
 
-                    });
+            try{if (Avatar == "None")
+                    Avatar = AvatarPath;
+                SetPhoto(isgroupid.ToString(), Avatar);
+            }catch (Exception ex) { Debug.WriteLine(ex); }
+
+            // saving new group into base
+            var ReturnObject = new Dictionary<string, object>();
+            if (isgroupid != null && islink != null)
+            {
+                Groups gr = new Groups
+                {
+                    name = groupName ?? "new lec group" + _context.contusergroups.FirstOrDefault()?.id,
+                    group_id = (string)isgroupid,
+                    group_link = (string)islink,
+                };
+                ReturnObject.Add("BasegroupId", gr); // add base gr id to take it into AuthCodeGetting
+                _context.Add(gr);
+                var allusers = new List<string>();
+                allusers.AddRange(propernumbers); allusers.AddRange(admins);
+                foreach (string number in allusers)
+                {
+                    var userexist = _context.contusers.FirstOrDefault(w => w.userWhatsappId == number);
+                    if(userexist == null){
+                        _context.Add(new Users
+                        {
+                            userName = "",
+                            userWhatsappId = number,
+                            userGroup = gr,
+                            userStatus = admins.Contains(number) ? "admin" : "student"
+                        });
+                    }
+                }
                 _context.SaveChanges();
             }
-
-
-            if (admins != null)
-                MakeAdmin(MakeProperNumber<string>(admins), (string)isgroupid);
-
-            if (Avatar == "None") 
-                Avatar = AvatarPath;
-            SetPhoto(Avatar);
-
-            return "Check";
+            ReturnObject.Add("WhatsAppgroupId", isgroupid.ToString());
+            ReturnObject.Add("WhatsAppgroupLink", islink.ToString());
+            return ReturnObject;
         }
-
 
         public List<object> MakeAdmin(IEnumerable<string> admins, string chatid)
         {
             string link = $"https://api.green-api.com/waInstance{IdInstance}/setGroupAdmin/{ApiToken}";
-
             List<object> responses = new List<object>();
             foreach(string admin in admins){
                 var content_is = new Dictionary<string, object> { { "groupId", chatid }, { "participantChatId", admin} };
@@ -257,7 +299,7 @@ namespace itedu_assitant.forsave.Methods
             return new List<object> { "Check" };
         }
 
-        public void SetPhoto(string photoPath)
+        public void SetPhoto(string groupId, string photoPath)
         {
             using (HttpClient httpc = new HttpClient())
             {
@@ -271,8 +313,17 @@ namespace itedu_assitant.forsave.Methods
 
                 using (var formData = new MultipartFormDataContent())
                 {
+
+                    string isstring = string.Format(@"{{""groupId:"" ""{0}""}}", arg0: groupId);
+                    string secondString = JsonConvert.SerializeObject(new Dictionary<string, object> { { "groupId", groupId } });
+                   
+
+                    bool vall = isstring == secondString;
+                    formData.Add(new StringContent(isstring, Encoding.UTF8, "application/json"));;
                     formData.Add(new ByteArrayContent(bytearray), "file", "image/jpeg");
-                    HttpResponseMessage messge = httpc.PostAsync(requestLink, formData).Result;
+                    HttpResponseMessage message = httpc.PostAsync(requestLink, formData).Result;
+                    Debug.WriteLine(message.Content.ReadAsStringAsync().Result);
+                    Debug.WriteLine(message.StatusCode);
                 }
             }
         }

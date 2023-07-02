@@ -27,10 +27,10 @@ namespace itedu_assitant.forsave.Contact_is
 {
     public class CreateContact
     {
-        public CreateContact(BaseExec baseExec, StatExec statExec)
+        public CreateContact(BaseExec baseExec, string userIp)
         {
             _baseExec = baseExec;
-            _statExec = statExec;
+            UserIp = userIp;
             // set secrets before run
             SetSecrets();
         }
@@ -38,7 +38,7 @@ namespace itedu_assitant.forsave.Contact_is
         // is oversea values
         public BaseExec _baseExec;
         public StatExec _statExec;
-
+        public string UserIp;
 
         // below all static inner values
         static GoogleCredential creds;
@@ -55,7 +55,7 @@ namespace itedu_assitant.forsave.Contact_is
         public void SetSecrets()
         {
             // to datas from current directory
-            string ispath = Path.Combine(Directory.GetCurrentDirectory(), "forsave", "Contact_is", "Files");
+            string ispath = Path.Combine(Directory.GetCurrentDirectory(), "Extensions", "Contact_is", "Files");
             string datas = File.ReadAllText(Path.Combine(ispath, "authdata.json"));
 
             var isconverted = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, object>>>(datas);
@@ -94,11 +94,11 @@ namespace itedu_assitant.forsave.Contact_is
                         catch (Exception ex){
                             scopes = new List<string> { (string)isval["scope"] };
                         }
-
-                        _baseExec.SetInBase(atoken, (string)isval["refresh_token"], (int)isval["expires_in"], scopes);
+                        _baseExec.SetInBase(atoken, (string)isval["refresh_token"], Convert.ToInt32(isval["expires_in"]), scopes);
+                        
+                        
                         break;
                     }
-
                     // if token set is failed here goes only one time of removing it in line
                     else if(!attempt)
                     {
@@ -126,25 +126,28 @@ namespace itedu_assitant.forsave.Contact_is
                 creds = GoogleCredential.FromAccessToken(atoken).CreateScoped(Scopes);
                 return creds;
             }
-
             try{
 
                 var iscurrententry = _baseExec.GetFromBase();
-                if(iscurrententry.last_change.AddSeconds((double)iscurrententry.expires_in) >= DateTime.Now.Date.ToUniversalTime())
+
+                DateTime currentdexpiredate = iscurrententry.last_change.AddSeconds(iscurrententry.expires_in);
+                bool fordef = iscurrententry.last_change.AddSeconds((double)iscurrententry.expires_in) > DateTime.Now.ToUniversalTime();
+                if (fordef)
                     creds = GetHashCode(iscurrententry.access_token);
                 else
                 {
                     // it is actually needless but stays for a reason of TODO
                     //this.RevokeToken(iscurrententry.refresh_token);
+                    Debug.WriteLine("Manually excepting");
                     throw new Exception();
                 }
             }catch (Exception ex){
                 Debug.WriteLine(ex);
-                content = new Tuple<bool, string>(false, _statExec.GenerateRedirectLink(client_id));
+                content = new Tuple<bool, string>(false, StatExec.GenerateRedirectLink(client_id, UserIp));
                 return this;
             }
 
-            // laslty inintaliztion of code for making http requests without struggling in peopleservices
+            // laslty inintalization of code for making http requests without struggling in peopleservices
             peopleService = new PeopleServiceService(new BaseClientService.Initializer(){
                 HttpClientInitializer = creds,
                 ApplicationName = appname,
@@ -155,14 +158,16 @@ namespace itedu_assitant.forsave.Contact_is
             return this;
         }
         
-        public void Number(string group_id)
+        public void Number(string group_id, bool contactToAdmins=false)
         {
             var users = _baseExec.GetUserById(group_id);
             foreach(var user in users){
-                this.setPeople(user.userName, user.userPhoneNumber);
+                if(user.userStatus == "admin" && !contactToAdmins){}
+                else
+                    this.setPeople(user.userName, user.userWhatsappId);
             }
         }
-
+            
         public void Number(List<Dictionary<string, string>> numbers)
         {
             foreach(var user in numbers){

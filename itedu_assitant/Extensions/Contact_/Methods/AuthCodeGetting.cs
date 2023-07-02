@@ -21,16 +21,20 @@ namespace itedu_assitant.forsave.Contact_is.Methods
 
         public Tuple<bool, string> ExecuteCreatingContact(ContactMembers contactMembers = null, bool byQueue = false)
         {
+            Action<ContactMembers> Check = (contacts) => { if (byQueue == false && contacts != null) SetToQueue(contacts); };
+
             var objectIs = Creater.SetCredential();
             if (objectIs.content.Item1)
             {
-                if (contactMembers == null && byQueue)
+                if (contactMembers == null || byQueue)
                 {
+                    Check(contactMembers);
                     var enval = Environment.GetEnvironmentVariable("ContactCreateTask");
+                    // what value is actually returns
                     if (enval == null || enval == "false")
                     {
                         // Here goes first run if here is not active thread
-                        BackgroundTaskManage isback = new BackgroundTaskManage(QueueExecuting, new Dictionary<string, object> { { "execobjec", objectIs } });
+                        BackgroundTaskManage isback = new BackgroundTaskManage().SetArgs(QueueExecuting, new Dictionary<string, object> { { "execobjec", objectIs } });
                         CancellationTokenSource nct = new CancellationTokenSource();
                         isback.StartAsync(nct.Token);
                     }
@@ -45,8 +49,7 @@ namespace itedu_assitant.forsave.Contact_is.Methods
             else
             {
                 // here is only one time, in contact manager will set values when it only presence
-                if (byQueue == false && contactMembers != null)
-                    SetToQueue(contactMembers);
+                Check(contactMembers);
 
                 // and lasly returns failure value to redirect specefic url
                 return new Tuple<bool, string>(false, objectIs.content.Item2);
@@ -64,17 +67,22 @@ namespace itedu_assitant.forsave.Contact_is.Methods
                 }
                 objectIs.Number(values);
             }
-            else if (contactMembers.groupId != null)
-                objectIs.Number(contactMembers.groupId.ToString());
+            else if (contactMembers.groupId != null || contactMembers.groupId != 0)
+                objectIs.Number(contactMembers.groupId.ToString(), contactMembers.admininc);
         }
 
         // It has his own method to make either with queue or model one time
         public static void QueueExecuting(object? state)
         {
-            if (state.GetType() == typeof(Dictionary<,>))
+            var isdict = state as Dictionary<string, object>;
+            bool check = state.GetType() == typeof(Dictionary<string, object>);
+            bool check2 = state.GetType() is Dictionary<string, object>;
+
+
+            if (isdict != null)
             {
                 Dictionary<string, object> istate = (Dictionary<string, object>)state;
-                CreateContact objectIs = (CreateContact)istate["execobject"];
+                CreateContact objectIs = (CreateContact)istate["execobjec"];
 
                 // to set that thread actually working and no needs to run it 
                 Environment.SetEnvironmentVariable("ContactCreateTask", "true");
@@ -98,27 +106,37 @@ namespace itedu_assitant.forsave.Contact_is.Methods
         }
 
         // TODO one check of queue save please
-        public void SetToQueue(ContactMembers values)
+        static public void SetNewQueue(Queue<string> queue)
+        {
+            QueueSer isqueue = new QueueSer();
+            isqueue.Serialize(queue);
+        }
+
+        static public void SetToQueue(ContactMembers values)
         {
             // Actually it runs when here goes values of first step failure
             QueueSer iserializer = new QueueSer();
-            var isserobj = iserializer.DeSerialize();
+            var isserobj = iserializer.DeSerialize<Queue<string>>();
 
-            if (!(bool)isserobj)
-                isserobj = new Queue<string>();
-            ((Queue<string>)isserobj).Enqueue(JsonConvert.SerializeObject(values));
-            iserializer.Serialize(isserobj);
+            var istype = isserobj as Queue<string>;
+            if (istype == null)
+                istype = new Queue<string>();
+
+            istype.Enqueue(JsonConvert.SerializeObject(values));
+            iserializer.Serialize(istype);
         }
         static public object GetQueue()
         {
             QueueSer iser = new QueueSer();
-            var stackobject = iser.DeSerialize();
-            if (!(bool)stackobject)
+            var stackobject = iser.DeSerialize<Queue<string>>();
+            if (!(stackobject is bool))
             {
                 var isqueue = (Queue<string>)stackobject;
                 if (isqueue.Count() > 0)
                 {
                     string isfirsline = isqueue.Dequeue();
+                    // to save whole queue which were decreased
+                    SetNewQueue(isqueue);
                     return JsonConvert.DeserializeObject<ContactMembers>(isfirsline);
                 }
                 else return false;

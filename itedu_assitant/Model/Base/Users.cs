@@ -6,7 +6,7 @@ namespace itedu_assitant.Model.Base
     {
         public int id { get; set; }
         public string userName { get; set; }               
-        public string userPhoneNumber { get; set; }
+        public string userWhatsappId { get; set; }
         public Groups userGroup { get; set; }
         public string userStatus { get; set; }
         [DefaultValue(value:false)]

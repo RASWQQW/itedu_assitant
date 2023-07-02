@@ -1,21 +1,37 @@
 ﻿namespace itedu_assitant.forsave.Methods
 {
-    public class Manager : Object
+    public class NumberManager : Object
     {
 
-        public Manager(): base()
+        public NumberManager(): base()
         {
 
         }
 
+        public void GetProperNumber(string isnumber, out string outnumber)
+        {
+
+            // there number have to be either with + (+77789197489) number or default (87789197489)
+            outnumber = isnumber;
+            if (isnumber.Length <= 12)
+            {
+                outnumber = (isnumber.StartsWith("+")
+                    ? isnumber[1..]
+                    : $"{Convert.ToInt32(isnumber[0].ToString()) - 1}{isnumber[1..]}");
+            }
+        }
         public string GetNumberAsToken(object number)
         {
             string _modnumber = number.ToString();
             string retval = null;
             
-            if (_modnumber.Length <= 11 && _modnumber.All(Char.IsDigit)){
-                retval = (_modnumber.StartsWith("+") ? _modnumber[1..] : $"{Convert.ToInt32(_modnumber[0].ToString()) - 1}{_modnumber[1..]}")+"@c.us";
-            }else{
+            if (_modnumber.Length <= 12){
+                GetProperNumber(_modnumber, out retval);
+                retval = retval + "@c.us";
+            }
+            else{
+
+                // it work with group id if its too origin or to modify
                 if (_modnumber.Length > 11 && _modnumber.Length <= 35)
                     if (_modnumber.Contains("@g.us"))
                         retval = _modnumber;
@@ -27,7 +43,6 @@
         }
     
     }
-
     public struct checkVal
     {
 
