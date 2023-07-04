@@ -28,7 +28,7 @@ namespace itedu_assitant.forsave.Contact_is.Methods
             {
                 if (contactMembers == null || byQueue)
                 {
-                    Check(contactMembers);
+                    Check(contactMembers); // its optional value it did not need sevear value
                     var enval = Environment.GetEnvironmentVariable("ContactCreateTask");
                     // what value is actually returns
                     if (enval == null || enval == "false")

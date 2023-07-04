@@ -18,10 +18,12 @@ namespace itedu_assitant
             // Add services to the container.
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 
+            //builder.Services.AddSingleton<IConnectionMultiplexer>(new rediscontext().connectionmpx);
+            //builder.Services.AddHostedService<BackgroundTaskManage>();
 
             builder.Services.AddAuthentication();
             builder.Services.AddControllers();
-            builder.Services.AddEndpointsApiExplorer();
+            //builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
             builder.Services.AddDbContext<dbcontext>();
             
@@ -44,43 +46,38 @@ namespace itedu_assitant
                     }});
                });
 
-            //builder.Services.AddSingleton<IConnectionMultiplexer>(new rediscontext().connectionmpx);
-            //builder.Services.AddHostedService<BackgroundTaskManage>();
 
             var app = builder.Build();
 
-
-            // add logger
-
-            // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
 
+
+            //app.MapControllerRoute(
+            //    name: "default",
+            //    pattern: "{controller=Home}/{action=Meeting}/{id?}");
+
+            app.UseHttpsRedirection();
+            app.UseAuthorization();
+            app.MapControllers();
+
+
+            // Configure the HTTP request pipeline.
             app.UseForwardedHeaders(new ForwardedHeadersOptions
             {
                 ForwardedHeaders = ForwardedHeaders.XForwardedFor |
                 ForwardedHeaders.XForwardedProto
             });
 
-            app.UseHttpsRedirection();
+            //app.UseRouting().UseMiddleware<Middleware>().UseEndpoints(
+            //    endpoints =>
+            //    {
+            //        endpoints.MapControllers();
+            //    });
 
-            app.UseAuthorization();
-
-            //app.MapControllerRoute(
-            //    name: "default",
-            //    pattern: "{controller=Home}/{action=Meeting}/{id?}");
-
-            app.UseRouting().UseMiddleware<Middleware>().UseEndpoints(
-                endpoints =>
-                {
-                    endpoints.MapControllers();
-                });
-
-
-            app.MapControllers();
             app.Run();
         }
     }

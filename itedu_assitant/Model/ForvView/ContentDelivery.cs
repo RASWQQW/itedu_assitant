@@ -2,8 +2,8 @@
 {
     public class ContentDelivery
     {
-        public string type { get; set; } // json, form
-        public Dictionary<string, object> jsoncontent { get; set; } = null;
-        public Dictionary<string, object> formcontent { get; set; } = null;
+        public string type { get; set; } // json, form wether one of them and gets one of it 
+        public Dictionary<string, object> jsoncontent { get; set; } = null; // its stands null
+        public Dictionary<string, object> formcontent { get; set; } = null; // or it or both stands present
     }
 }

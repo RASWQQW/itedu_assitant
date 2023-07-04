@@ -22,6 +22,7 @@ using RestSharp;
 using Microsoft.EntityFrameworkCore;
 using itedu_assitant.Model.Base;
 using itedu_assitant.forsave.Contact_is.Methods;
+using itedu_assitant.forsave.Methods;
 
 namespace itedu_assitant.forsave.Contact_is
 {
@@ -157,14 +158,26 @@ namespace itedu_assitant.forsave.Contact_is
             
             return this;
         }
-        
+
+        public void ContactSaveNoticer(List<List<object>> contacts)
+        {
+            //Wh_Instance.Create();
+            foreach(var contact in contacts)
+            {
+            }
+        }
+
         public void Number(string group_id, bool contactToAdmins=false)
         {
             var users = _baseExec.GetUserById(group_id);
             foreach(var user in users){
-                if(user.userStatus == "admin" && !contactToAdmins){}
-                else
+                if (!user.hasContact)
+                {
+                    if (user.userStatus == "admin" && !contactToAdmins) { }
+                    else
+                        _baseExec.AcceptContact(user);
                     this.setPeople(user.userName, user.userWhatsappId);
+                }
             }
         }
             
@@ -172,6 +185,7 @@ namespace itedu_assitant.forsave.Contact_is
         {
             foreach(var user in numbers){
                 this.setPeople(user["ContactName"], user["PhoneNumber"]);
+                _baseExec.AcceptContact(whId: user["PhoneNumber"]);
             }
         }
 

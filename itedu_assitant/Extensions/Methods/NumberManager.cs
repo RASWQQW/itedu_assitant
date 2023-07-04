@@ -20,7 +20,7 @@
                     : $"{Convert.ToInt32(isnumber[0].ToString()) - 1}{isnumber[1..]}");
             }
         }
-        public string GetNumberAsToken(object number)
+        public string GetNumberAsId(object number)
         {
             string _modnumber = number.ToString();
             string retval = null;
@@ -40,19 +40,16 @@
             }
 
             return retval;
+
+        }
+
+        public string GetNumbreFromId(string WhatsapId)
+        {
+            if(WhatsapId.Contains("@c.us") && WhatsapId.Length <= 16)
+                return (Convert.ToInt32(WhatsapId[0].ToString()) + 1).ToString() + WhatsapId[1..-5];
+           
+            return default;
         }
     
-    }
-    public struct checkVal
-    {
-
-       public checkVal(string val1, string val2)
-       {
-            val11 = val1;
-            val22 = val2;
-       }
-        public string val11 { get; private set; }
-        public string val22 { get; private set; }
-
     }
 }

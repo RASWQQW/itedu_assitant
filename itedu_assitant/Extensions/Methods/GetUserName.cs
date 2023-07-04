@@ -15,7 +15,6 @@ namespace itedu_assitant.forsave.Methods
         {
             
         }
-
         public GetUserName GetResponse(string UserNumber)
         {
             new NumberManager().GetProperNumber(UserNumber, out string userNumber);

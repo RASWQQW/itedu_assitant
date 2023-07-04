@@ -17,6 +17,8 @@ using Microsoft.Extensions.Primitives;
 using itedu_assitant.Model.Base;
 using Microsoft.EntityFrameworkCore;
 using Aspose.Email;
+using itedu_assitant.Model.ForvView;
+using System.Net.Http;
 
 namespace itedu_assitant.forsave.Methods
 {
@@ -78,7 +80,7 @@ namespace itedu_assitant.forsave.Methods
                 //Dictionary<string, object> ResponseMessage = JsonConvert.DeserializeObject<Dictionary<string, object>>(message);
 
                 string givenString = ResponseMessage["message"].ToString();
-                if (givenString != null)
+                if (givenString != null && !givenString.ToLower().Contains("already"))
                 {
                     byte[] imageBytes = Convert.FromBase64String(givenString);
                     string filename = QRPath + "\\UserQr.png";
@@ -86,7 +88,7 @@ namespace itedu_assitant.forsave.Methods
                     return filename;
                 }
                 else
-                    return "Expected bytes are absence";
+                    return givenString;
             }
         }
         
@@ -140,16 +142,15 @@ namespace itedu_assitant.forsave.Methods
                 // GetActionUrl(typeof(HomeController).GetMethods().FirstOrDefault(w => w.Name.Contains("SetNumber")).Name)
                 return $"You must to login {GetActionUrl("SetNumber")}";
 
-            chat_id = new NumberManager().GetNumberAsToken(chat_id);
+            chat_id = new NumberManager().GetNumberAsId(chat_id);
             var link = $"https://api.green-api.com/waInstance{IdInstance}/SendMessage/{ApiToken}";
-            Dictionary<string, object> current_json = new Dictionary<string, object> { { "chatId", chat_id }, { "message", message } };
-            var newsendingvalue = 
-                new List<Dictionary<string, object>>{ 
-                    new Dictionary<string, object> { 
-                        { "type", "json" }, 
-                        { "jsoncontent", current_json } 
-                    } 
-                };
+            var newsendingvalue = new List<ContentDelivery>(){ };
+            newsendingvalue.Add(
+                    new ContentDelivery{ 
+                        type="json",
+                        jsoncontent = new Dictionary<string, object> { { "chatId", chat_id }, { "message", message } }
+                    }
+                );
 
             string messge_id = RequestSender(link, qtype: "post", values: newsendingvalue) ;
             return messge_id;
@@ -172,14 +173,15 @@ namespace itedu_assitant.forsave.Methods
                     DeleteUser(user.userWhatsappId,curgr.group_id);
                 }
 
-                var leaveUrl = $"https://api.green-api.com/waInstance{Instance}/leaveGroup/{ApiToken}";
+                var leaveUrl = $"https://api.green-api.com/waInstance{IdInstance}/leaveGroup/{ApiToken}";
 
-                var val1 = new Dictionary<string, object> { { "groupId", curgr.group_id} };
-                var vals = new List<Dictionary<string, object>> { 
-                    new Dictionary<string, object> 
-                    { { "type", "json"}, {"jsonconten", val1 } } };
-
-                RequestSender(leaveUrl, qtype: "post", values: vals);
+                var data = new List<ContentDelivery>() { };
+                data.Add(new ContentDelivery{
+                        type = "json",
+                        jsoncontent = new Dictionary<string, object> { { "groupId", curgr.group_id } }
+                    }
+                );
+                RequestSender(leaveUrl, qtype: "post", values: data);
             }
             _context.SaveChanges();
 
@@ -194,24 +196,54 @@ namespace itedu_assitant.forsave.Methods
 
         public void DeleteUser(string UserId, string GroupId)
         {
-            var deleteLink = $"https://api.green-api.com/waInstance{Instance}/removeGroupParticipant/{ApiToken}";
-            var userdata = new Dictionary<string, object> { { "groupId", UserId }, { "participantChatId",  GroupId} };
-            var data = new List<Dictionary<string, object>> { 
-                new Dictionary<string, object> { 
-                    { "type", "json"}, 
-                    { "jsoncontent", userdata} }
-            };
+            var deleteLink = $"https://api.green-api.com/waInstance{IdInstance}/removeGroupParticipant/{ApiToken}";
 
-            RequestSender(Link: deleteLink, values: data, qtype: "post");
+            var contents = new List<ContentDelivery>() { };
+            contents.Add(new ContentDelivery {
+                        type = "json",
+                        jsoncontent = new Dictionary<string, object> { { "groupId", UserId }, { "participantChatId", GroupId } }
+                    }
+            );
+
+            RequestSender(Link: deleteLink, values: contents, qtype: "post");
             
             // https://green-api.com/docs/api/groups/LeaveGroup/
         }
 
+        public List<string> MakeProperNumber<T>(List<T> numbers)
+        {
+            List<string> newchatIds = new List<string>();
+            for (int i = 0; i < numbers.Count(); i++)
+            {
+                newchatIds.Add(new NumberManager().GetNumberAsId(numbers.ToList()[i]));
+            }
+            return newchatIds;
+        }
 
+        public dynamic AddUsersToGroup(List<string> Users, string gr_id)
+        {
+            string link = $"https://api.green-api.com/waInstance{IdInstance}/addGroupParticipant/{ApiToken}";
+            List<string> userNumbers = MakeProperNumber<string>(Users);
 
+            foreach(string userNumber in userNumbers)
+            {
+                var sendingcontent = new List<ContentDelivery>() { };
+                sendingcontent.Add(
+                        new ContentDelivery{
+                            type = "json",
+                            jsoncontent = new Dictionary<string, object> { { "groupId", gr_id }, { "participantChatId", userNumber } }
+                        });
+
+                var response = RequestSender(link, values: sendingcontent, qtype: "post");
+                Debug.WriteLine(response);
+            }
+
+            return "Success";
+        }
         // create group
-        public new dynamic CreateGroup(string groupName,
-                                List<string> chatIds,
+        public dynamic CreateGroup(List<string> properNumbers,
+                                Groups newGroup,
+                                string groupName = null,
                                 List<string> admins = null,
                                 string Avatar = "None")
         {
@@ -219,31 +251,26 @@ namespace itedu_assitant.forsave.Methods
                 // GetActionUrl(typeof(HomeController).GetMethods().FirstOrDefault(w => w.Name.Contains("SetNumber")).Name)
                 return $"You must to login {GetActionUrl("SetNumber")}";
 
-            List<string> MakeProperNumber<T>(List<T> numbers) {
-                List<string> newchatIds = new List<string>();
-                for (int i = 0; i < numbers.Count(); i++)
-                {
-                    newchatIds.Add(new NumberManager().GetNumberAsToken(numbers.ToList()[i]));
-                }
-                return newchatIds;
-            }
             string func_link = $"https://api.green-api.com/waInstance{IdInstance}/createGroup/{ApiToken}";
-            admins = MakeProperNumber<string>(admins);
-            var propernumbers = MakeProperNumber<string>(chatIds);
-            var currentContent = new Dictionary<string, object> { { "groupName", groupName }, { "chatIds", propernumbers } };
-            var iscontent = new List<Dictionary<string, object>> {
-                new Dictionary<string, object> { 
-                    { "type", "json" }, 
-                    { "jsoncontent", currentContent}
-                }
-            };
+            var newadmins = new List<string>();
 
-            var isresult = JsonConvert.DeserializeObject<Dictionary<string, object>>(RequestSender(func_link, qtype: "post", iscontent));
+            for(int v = 0; v < admins.Count(); v++){
+                newadmins.Add(properNumbers.FirstOrDefault(val => val.Contains(admins[v][1..])));
+            }
+
+            var data = new List<ContentDelivery>() { };
+            data.Add(new ContentDelivery{
+                    type = "json",
+                    jsoncontent = new Dictionary<string, object> { { "groupName", newGroup.name }, { "chatIds", properNumbers } }
+                }
+            );
+
+            var isresult = JsonConvert.DeserializeObject<Dictionary<string, object>>(RequestSender(func_link, qtype: "post", data));
             isresult.TryGetValue("chatId", out object? isgroupid);
             isresult.TryGetValue("groupInviteLink", out object? islink);
 
             // start of the base and other stuffs
-            try{if (admins != null || admins.Count() > 0)
+            try{if (newadmins != null || newadmins.Count() > 0)
                     MakeAdmin(admins, (string)isgroupid);
             }catch (Exception ex) { Debug.WriteLine(ex); }
 
@@ -252,35 +279,20 @@ namespace itedu_assitant.forsave.Methods
                 SetPhoto(isgroupid.ToString(), Avatar);
             }catch (Exception ex) { Debug.WriteLine(ex); }
 
-            // saving new group into base
             var ReturnObject = new Dictionary<string, object>();
+
+            // saving new group into base
+            // [OPTIONAL]
             if (isgroupid != null && islink != null)
             {
-                Groups gr = new Groups
-                {
-                    name = groupName ?? "new lec group" + _context.contusergroups.FirstOrDefault()?.id,
-                    group_id = (string)isgroupid,
-                    group_link = (string)islink,
-                };
-                ReturnObject.Add("BasegroupId", gr); // add base gr id to take it into AuthCodeGetting
-                _context.Add(gr);
-                var allusers = new List<string>();
-                allusers.AddRange(propernumbers); allusers.AddRange(admins);
-                foreach (string number in allusers)
-                {
-                    var userexist = _context.contusers.FirstOrDefault(w => w.userWhatsappId == number);
-                    if(userexist == null){
-                        _context.Add(new Users
-                        {
-                            userName = "",
-                            userWhatsappId = number,
-                            userGroup = gr,
-                            userStatus = admins.Contains(number) ? "admin" : "student"
-                        });
-                    }
-                }
+                newGroup.group_id = (string)isgroupid;
+                newGroup.group_link = (string)islink;
+                
+                ReturnObject.Add("BasegroupId", newGroup); // add base gr id to take it into AuthCodeGetting
+                _context.Update(newGroup);
                 _context.SaveChanges();
             }
+
             ReturnObject.Add("WhatsAppgroupId", isgroupid.ToString());
             ReturnObject.Add("WhatsAppgroupLink", islink.ToString());
             return ReturnObject;
@@ -292,7 +304,7 @@ namespace itedu_assitant.forsave.Methods
             List<object> responses = new List<object>();
             foreach(string admin in admins){
                 var content_is = new Dictionary<string, object> { { "groupId", chatid }, { "participantChatId", admin} };
-                var response = RequestSender(link, qtype: "post", new List<Dictionary<string, object>> { new Dictionary<string, object> { { "type", "json" }, { "jsoncontent", content_is } } });
+                var response = RequestSender(link, qtype: "post", new List<ContentDelivery> { new ContentDelivery { type = "json", jsoncontent = content_is } });
                 responses.Add(response);
             }
 
@@ -328,7 +340,7 @@ namespace itedu_assitant.forsave.Methods
             }
         }
 
-        public string RequestSender(string Link, string qtype, List<Dictionary<string, object>>? values = null)
+        public string RequestSender(string Link, string qtype, List<ContentDelivery> values = null)
         {
             using (HttpClient httpc = new HttpClient())
             {
@@ -338,35 +350,33 @@ namespace itedu_assitant.forsave.Methods
                 if (qtype == "post" && values != null)
                 {
                     var formData = new MultipartFormDataContent();
-                    StringContent content = null;
+                    StringContent Stringcontent = null;
 
-                    foreach (Dictionary<string, object> val in values)
+                    foreach (ContentDelivery itercontent in values)
                     {
-                        if(val.ContainsKey("type"))
-                            if (val["type"].ToString() == "json")
+                        if(Stringcontent == null && itercontent.type != null) { 
+                            if (itercontent.type == "json")
                             {
-                                if (val.ContainsKey("jsoncontent") && val["jsoncontent"] is Dictionary<string, object>)
-                                {
-                                    var currentjson = val["jsoncontent"];
-                                    Debug.WriteLine(currentjson + " " + currentjson.GetType().ToString());
-                                    string isstring = JsonConvert.SerializeObject(currentjson);
-                                    content = new StringContent(isstring, Encoding.UTF8, "application/json");
-                                }
-                                else if (val["type"] == "form"){
-                                    var firstarg = val["type"];
-                                    Dictionary<string, object> nexc = val.ContainsKey("content") ? (Dictionary<string, object>)val["content"] : null;
-                                    if (firstarg as HttpContent != null)
-                                       if (nexc == null)
-                                           formData.Add((HttpContent)firstarg);
-                                       else
-                                           formData.Add((HttpContent)firstarg, nexc.ContainsKey("name") ? (string)nexc["name"] : default, nexc.ContainsKey("filename") ? (string)nexc["filename"] : default);
-                                }   
-                            }
-                    }
+                                var currentjson = itercontent.jsoncontent;
+                                
+                                Debug.WriteLine(currentjson + " " + currentjson.GetType().ToString());
 
+                                string isstring = JsonConvert.SerializeObject(currentjson);
+                                Stringcontent = new StringContent(isstring, Encoding.UTF8, "application/json");
+                            }
+                            else if (itercontent.type == "form"){
+                                Dictionary<string, object> ccontent = itercontent.formcontent;
+                                if (ccontent["HttpContent"] as HttpContent != null){
+                                    formData.Add((HttpContent)ccontent["HttpContent"],
+                                                ccontent.ContainsKey("name") ? (string)ccontent["name"] : default,
+                                                ccontent.ContainsKey("filename") ? (string)ccontent["filename"] : default);
+                                }
+                            }
+                        }
+                    }
                     HttpResponseMessage message;
-                    if (content != null)
-                        message = httpc.PostAsync(Link, content).Result;
+                    if (Stringcontent != null)
+                            message = httpc.PostAsync(Link, Stringcontent).Result;
                     else
                         message = httpc.PostAsync(Link, formData).Result;
 

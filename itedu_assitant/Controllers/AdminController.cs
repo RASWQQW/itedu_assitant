@@ -28,11 +28,13 @@ namespace itedu_assitant.Controllers
             try
             {
                 var res = Container.GetQr();
+                if (res.Contains("already"))
+                    return Ok("You cant log in is already logged in");
+
                 byte[] readqr = System.IO.File.ReadAllBytesAsync(res).Result;
                 return File(readqr, "image/jpeg");
             }
-            catch (Exception ex)
-            {
+            catch (Exception ex){
                 return base.Content($"<h1>There happened trouble{ex}<h1>", "text/html");
             }
         }

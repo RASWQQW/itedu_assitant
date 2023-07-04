@@ -1,6 +1,7 @@
 ﻿using itedu_assitant.DB;
 using itedu_assitant.Model.Base;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 
 namespace itedu_assitant.forsave.Contact_is.Methods
 {
@@ -12,6 +13,17 @@ namespace itedu_assitant.forsave.Contact_is.Methods
         }
 
         public dbcontext _context;
+
+        public void AcceptContact(Users iscontact = null, string whId = null)
+        {
+            if (whId != null && iscontact == null) {
+                iscontact = _context.contusers.FirstOrDefault(val => val.userNumber == whId);
+            }
+
+            iscontact.hasContact = true;
+            _context.Update(iscontact);
+            _context.SaveChanges();
+        }
 
         public IEnumerable<Users> GetUserById(string group_id)
         {

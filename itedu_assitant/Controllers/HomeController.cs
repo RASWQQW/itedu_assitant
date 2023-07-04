@@ -30,7 +30,7 @@ namespace itedu_assitant.Controllers
             // Theses all secondry setting variables and gets vals after setting env and global vals
             _context = dbcontext;
             endpoints = data_endpoints;
-            Container = Wh_Instance.Create(endpoints: endpoints, context: _context);
+            Container = Wh_Instance.Create(_context, data_endpoints);
             checkActive = new InstanceCheckActive(dbcontext: _context, isclass: Container);
         }
 
@@ -64,8 +64,8 @@ namespace itedu_assitant.Controllers
                     if (s_message == null || s_message == "string")
                         return Ok("Each User Message is required, Please check it validated");
 
-                    var chagedstr = s_message.Replace("{username}", message.UserName ?? "").Replace("|N", "\n");
-                    responses.Add(Container.Send_Message(message.Chat_id, chagedstr));
+                    var changedstr = s_message.Replace("{username}", message.UserName ?? new GetUserName().GetResponse(message.Chat_id).__GetUserName()).Replace("|N", "\n");
+                    responses.Add(Container.Send_Message(message.Chat_id, changedstr));
                 }
                 return Ok(responses);
             }
@@ -97,58 +97,6 @@ namespace itedu_assitant.Controllers
                 }
             }
             return Ok("Bad request");
-        }
-
-        [ProducesResponseType(200, Type = typeof(OkObjectResult))]
-        [HttpPost("/create_group")]
-        public OkObjectResult ForCreateG([FromForm] Check val)
-        {
-            if (Request.Method == "POST")
-            {
-                string ispath = "None";
-                var is_group_image = val.group_image;
-                if(is_group_image != null) {
-                    ispath = Path.Combine(Directory.GetCurrentDirectory(), "Extensions", "Files", "userimages", "groupimage.png");
-
-                    void createImage(){
-                        using (Stream isstream = new FileStream(ispath, FileMode.OpenOrCreate)){
-                            is_group_image.CopyToAsync(isstream);
-                            isstream.Close();
-                        };
-                        if (!System.IO.File.Exists(ispath))
-                        {
-                            Thread.Sleep(500);
-                            createImage();
-                        }
-                    };
-                    createImage();
-                }
-                
-                var groupVal = Container.CreateGroup(
-                    groupName: val.groupname, 
-                    admins: val.admins, 
-                    chatIds: val.users, 
-                    Avatar: ispath);
-
-                // parts of using new created group by user values
-                if (groupVal.GetType()  == typeof(Dictionary<,>) )
-                {
-                    if(val.Hello_Message != null)
-                    {
-                        string hmessage = val.Hello_Message;
-                        if (hmessage.Trim() == "default")
-                            hmessage = $"Our invite link - {groupVal["WhatsAppgroupLink"]}";
-                        Container.Send_Message(groupVal["WhatsAppgroupId"], hmessage);
-                    }
-                    if (val.Save_Contacts)
-                    {
-                        var iscreator = new ContactClassManager().ContactGatherer(new BaseExec(_context), HttpContext);
-                        iscreator.ExecuteCreatingContact(new ContactMembers() { groupId = groupVal["BasegroupId"], admininc = val.Save_Admin_Contacts});
-                    }
-                }
-                return Ok(groupVal);
-            }
-            return Ok("There is no relevant response");
         }
     }
 }
